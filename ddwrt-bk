@@ -315,11 +315,23 @@ if [ ${RESTORE} -eq 1 ]; then
 	echo "You must select a restore mode -i or -n"
 	exit 1
     fi
-    tar -xvzf ${FILE} -C ${TMP_DIR}
-    if [ ${IMG} -eq 1 ]; then
-	#Extract image from backup
-	echo "nvram restore ${TMP_DIR}/nvram.img"
-	ls ${TMP_DIR}
+    tar -xzf ${FILE} -C ${TMP_DIR}
+    if [ $? -eq 0 ]; then
+	if [ ${PROMPT} -eq 1 ]; then
+	    echo "This operation will overwrite the current configuration of this device."
+	    while true; do
+		read -p "Press 'Yes' to continue?" yn
+		case $yn in
+		    [Y]* ) break;;
+		    [Nn]* ) rm -rf ${TMP_DIR} && exit 255;;
+		    * ) echo "Please answer Yes or No.";;
+		esac
+	    done
+	fi
+	if [ ${IMG} -eq 1 ]; then
+	    #Extract image from backup
+	    echo "nvram restore ${TMP_DIR}/nvram.img"
+	fi
     fi
     
     #rm -rf ${TMP_DIR}
