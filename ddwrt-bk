@@ -34,7 +34,7 @@ export PATH=/opt/bin:/opt/sbin:/opt/usr/sbin:/bin:/usr/bin:/sbin:/usr/sbin:/jffs
 
 DATE=`date +%Y%m%d%S`
 HOST=`nvram get wan_hostname | tr -d ":"`
-FILE=${FOLDER}/${HOST}-${DATE}.tar.gz
+FILE=""
 NAME="$0"
 [ -z "`which readlink`" ] || NAME="`readlink -f "${NAME}"`"
 CUR_DIR=`dirname ${NAME}`
@@ -45,7 +45,9 @@ TMP_DIR=/tmp/ddwrt-bk
 RESTORE=0
 IMG=0
 NVR=0
-     
+TYPE=minimal
+PROMPT=1
+
 TO_ALL=${TMP_DIR}/all.sh
 TO_INCLUDE=${TMP_DIR}/essential.sh
 TO_EXCLUDE=${TMP_DIR}/dangerous.sh
@@ -69,7 +71,7 @@ minimal'
 #
 #   ./ddwrt-bk -r -t minimal -f /jffs/backups/ddwrt-2015100601.tar.gz
 #
-#   ./ddwrt-bk -b -j -o -i -f /jffs/backups/ddwrt-2015100601.tar.gz 
+#   ./ddwrt-bk -i -n -f /jffs/backups/ddwrt-2015100601.tar.gz 
 #
 #   The above command with use the user and password and
 #   server information from the command line
@@ -84,7 +86,8 @@ do
 	n)   NVR=1;;
 	t)   TYPE="$OPTARG";;
 	f)   FILE="$OPTARG";;
-	?)   printf "Usage: %s: [-r] [-j] [-o] [-i] [-t type] [-f file]\n" $0
+	y)   PROMPT=0;;
+	?)   printf "Usage: %s: [-r] [-n] [-i] [-t type] [-f file]\n" $0
 	exit 2;;
     esac
 done
@@ -208,6 +211,9 @@ grep -q "^ *$" "${CONF_DIR}/vars_to_skip"     && sed -i -e '/^ *$/d' "${CONF_DIR
 
 
 if [ ${RESTORE} -eq 0 ]; then
+    if [ "{$FILE}" == "" ]; then
+	FILE=${BK_DIR}/${HOST}-${DATE}.tar.gz
+    fi
     if [ ${NVR} -eq 1 ]; then
 	echo "Backing up portable nvram values..."
 	#########################################################
@@ -289,7 +295,32 @@ if [ ${RESTORE} -eq 0 ]; then
     #########################################################
     # Compress restore scripts
     #########################################################
-    tar -cvzf ${BK_DIR}/${FILE} -C ${TMP_DIR} .
+    echo "Compressing backup and cleaning up..."
+    tar -cvzf ${FILE} -C ${TMP_DIR} .
 
     rm -rf ${TMP_DIR}
+    echo "Backup Complete"
+fi
+if [ ${RESTORE} -eq 1 ]; then
+    #Validation, only -i or -n can be used
+    if [ "${FILE}" == "" ]; then
+	echo "No restore file provided. What do you want me to restore?"
+	exit 1
+    fi
+    if [ ${IMG} -eq 1 -a ${NVR} -eq 1 ]; then
+	echo "Unsupported restore mode. Please select only one restore mode."
+	exit 1
+    fi
+    if [ ${IMG} -eq 0 -a ${NVR} -eq 0 ]; then
+	echo "You must select a restore mode -i or -n"
+	exit 1
+    fi
+    tar -xvzf ${FILE} -C ${TMP_DIR}
+    if [ ${IMG} -eq 1 ]; then
+	#Extract image from backup
+	echo "nvram restore ${TMP_DIR}/nvram.img"
+	ls ${TMP_DIR}
+    fi
+    
+    #rm -rf ${TMP_DIR}
 fi
