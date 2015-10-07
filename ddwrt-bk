@@ -105,10 +105,6 @@ if [ ! -d "${BK_DIR}" ]; then
     mkdir ${BK_DIR}
 fi
 
-if [ ! -f "${CONF_DIR}/ddwrt-bk.conf" ] ; then
- echo "${CONF_DIR}/ddwrt-bk.conf is missing"
- exit 1
-fi
 if [ ! -f "${CONF_DIR}/vars_to_skip" ] ; then
  echo "${CONF_DIR}/vars_to_skip is missing"
  exit 1
