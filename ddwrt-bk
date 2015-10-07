@@ -205,7 +205,7 @@ grep -q "^ *$" "${CONF_DIR}/vars_to_skip"     && sed -i -e '/^ *$/d' "${CONF_DIR
 
 
 if [ ${RESTORE} -eq 0 ]; then
-    if [ "{$FILE}" == "" ]; then
+    if [ "${FILE}" == "" ]; then
 	FILE=${BK_DIR}/${HOST}-${DATE}.tar.gz
     fi
     if [ ${NVR} -eq 1 ]; then
@@ -290,6 +290,7 @@ if [ ${RESTORE} -eq 0 ]; then
     # Compress restore scripts
     #########################################################
     echo "Compressing backup and cleaning up..."
+    
     tar -cvzf ${FILE} -C ${TMP_DIR} .
 
     rm -rf ${TMP_DIR}
