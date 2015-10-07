@@ -372,6 +372,7 @@ if [ ${RESTORE} -eq 1 ]; then
 		    ;;
 		* )
 		    echo "Unsupported restore type "${TYPE}"."
+		    exit 1
 		    ;;
 	    esac
 	fi
