@@ -43,10 +43,8 @@ BK_DIR=/jffs/backups
 TMP_DIR=/tmp/ddwrt-bk
 
 RESTORE=0
-JFFS=0
-OPT=0
 IMG=0
-NVR=1
+NVR=0
      
 TO_ALL=${TMP_DIR}/all.sh
 TO_INCLUDE=${TMP_DIR}/essential.sh
@@ -78,12 +76,10 @@ minimal'
 #
 #########################################################
 
-while getopts rjoit:f: name
+while getopts rint:f:? name
 do
     case $name in
 	r)   RESTORE=1;;
-	j)   JFFS=1;;
-	o)   OPT=1;;
 	i)   IMG=1;;
 	n)   NVR=1;;
 	t)   TYPE="$OPTARG";;
@@ -217,7 +213,7 @@ grep -q "^ *$" "${CONF_DIR}/vars_to_skip"     && sed -i -e '/^ *$/d' "${CONF_DIR
 
 if [ ${RESTORE} -eq 0 ]; then
     if [ ${NVR} -eq 1 ]; then
-	
+	echo "Backing up portable nvram values..."
 	#########################################################
 	#create NVRAM variale list and write to ${TMP_DIR}/all_vars
 	#########################################################
@@ -290,27 +286,11 @@ if [ ${RESTORE} -eq 0 ]; then
 	
     fi
     if [ ${IMG} -eq 1 ]; then
+	echo "Backing up nvram image..."
 	nvram backup ${TMP_DIR}/nvram.img
     fi
-    
-    if [ ${OPT} -eq 1 ]; then
-	mkdir ${TMP_DIR}/opt 
-	if [ $(command -v rsync) != "" ]; then
-	    rsync -a ${OPT_EXCLUDE} /opt/* ${TMP_DIR}/opt/
-	else
-	    cp -a /opt/* ${TMP_DIR}/opt/
-	fi
-    fi
-    if [ ${JFFS} -eq 1 ]; then
-	mkdir ${TMP_DIR}/jffs 
-	if [ $(command -v rsync) != "" ]; then
-	    rsync -a ${JFFS_EXCLUDE} /jffs/* ${TMP_DIR}/jffs/
-	else
-	    cp -a /jffs/* ${TMP_DIR}/jffs/
-	fi
-    fi
 fi
-	
+
 #########################################################
 # Compress restore scripts
 #########################################################
