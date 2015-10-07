@@ -330,9 +330,9 @@ if [ ${RESTORE} -eq 1 ]; then
 	fi
 	if [ ${IMG} -eq 1 ]; then
 	    #Extract image from backup
-	    echo "nvram restore ${TMP_DIR}/nvram.img"
+	    nvram restore ${TMP_DIR}/nvram.img
 	fi
     fi
     
-    #rm -rf ${TMP_DIR}
+    rm -rf ${TMP_DIR}
 fi
