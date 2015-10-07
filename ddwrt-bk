@@ -54,12 +54,6 @@ TO_EXCLUDE=${TMP_DIR}/dangerous.sh
 TO_PREFERRED=${TMP_DIR}/preferred.sh
 TO_MINIMAL=${TMP_DIR}/minimal.sh
 
-flavours='all
-essential
-dangerous
-preferred
-minimal'
-
 #########################################################
 # read command line switches
 #
@@ -78,7 +72,7 @@ minimal'
 #
 #########################################################
 
-while getopts rint:f:? name
+while getopts rinyt:f:? name
 do
     case $name in
 	r)   RESTORE=1;;
@@ -318,7 +312,7 @@ if [ ${RESTORE} -eq 1 ]; then
     tar -xzf ${FILE} -C ${TMP_DIR}
     if [ $? -eq 0 ]; then
 	if [ ${PROMPT} -eq 1 ]; then
-	    echo "This operation will overwrite the current configuration of this device."
+	    echo "This operation will overwrite the current configuration of this device. You will need to reboot for changes to take effect."
 	    while true; do
 		read -p "Press 'Yes' to continue?" yn
 		case $yn in
@@ -332,7 +326,55 @@ if [ ${RESTORE} -eq 1 ]; then
 	    #Extract image from backup
 	    nvram restore ${TMP_DIR}/nvram.img
 	fi
+	if [ ${NVR} -eq 1 ]; then	   	    
+	    case $TYPE in
+		"all" )
+		    if [ ${PROMPT} -eq 1 ]; then
+			echo "This restore type is device specific"
+			while true; do
+			    read -p "Are you sure you want to continue? (Yes|No)" yn
+			    case $yn in
+				[Y]* ) break;;
+				[Nn]* ) rm -rf ${TMP_DIR} && exit 255;;
+				* ) echo "Please answer Yes or No.";;
+			    esac
+			done
+		    fi
+		    ${TMP_DIR}/all.sh
+		    ;;
+		"essential" )
+		    echo "Restoring "${TYPE}" nvram parameters..."
+		    ${TMP_DIR}/essential.sh
+		    ;;
+		"preferred" )
+		    echo "Restoring "${TYPE}" nvram parameters..."
+		    ${TMP_DIR}/preferred.sh
+		    ;;
+		"dangerous" )
+		    if [ ${PROMPT} -eq 1 ]; then
+			echo "This restore type is device specific"
+			while true; do
+			    read -p "Are you sure you want to continue? (Yes|No)" yn
+			    case $yn in
+				[Y]* ) break;;
+				[Nn]* ) rm -rf ${TMP_DIR} && exit 255;;
+				* ) echo "Please answer Yes or No.";;
+			    esac
+			done
+		    fi
+		    echo "Restoring "${TYPE}" nvram parameters..."
+		    ${TMP_DIR}/dangerous.sh
+		    ;;
+		"minimal" )
+		    echo "Restoring "${TYPE}" nvram parameters..."
+		    ${TMP_DIR}/minimal.sh
+		    ;;
+		* )
+		    echo "Unsupported restore type "${TYPE}"."
+		    ;;
+	    esac
+	fi
     fi
-    
     rm -rf ${TMP_DIR}
+    echo "Please reboot this device to complete the restore"
 fi
