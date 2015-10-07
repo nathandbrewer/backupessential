@@ -39,10 +39,15 @@ NAME="$0"
 [ -z "`which readlink`" ] || NAME="`readlink -f "${NAME}"`"
 CUR_DIR=`dirname ${NAME}`
 CONF_DIR='/opt/etc/ddwrt-bk'
-
 BK_DIR=/jffs/backups
 TMP_DIR=/tmp/ddwrt-bk
 
+RESTORE=0
+JFFS=0
+OPT=0
+IMG=0
+NVR=1
+     
 TO_ALL=${TMP_DIR}/all.sh
 TO_INCLUDE=${TMP_DIR}/essential.sh
 TO_EXCLUDE=${TMP_DIR}/dangerous.sh
@@ -55,12 +60,52 @@ dangerous
 preferred
 minimal'
 
+#########################################################
+# read command line switches
+#
+#   example command lines
+#
+#   ./ddwrt-bk -r -i -f /jffs/backups/ddwrt-2015100601.tar.gz
+#
+#   Restores the nvram backup from the ddwrt-2015100601.tar.gz archive
+#
+#   ./ddwrt-bk -r -t minimal -f /jffs/backups/ddwrt-2015100601.tar.gz
+#
+#   ./ddwrt-bk -b -j -o -i -f /jffs/backups/ddwrt-2015100601.tar.gz 
+#
+#   The above command with use the user and password and
+#   server information from the command line
+#
+#########################################################
+
+while getopts rjoit:f: name
+do
+    case $name in
+	r)   RESTORE=1;;
+	j)   JFFS=1;;
+	o)   OPT=1;;
+	i)   IMG=1;;
+	n)   NVR=1;;
+	t)   TYPE="$OPTARG";;
+	f)   FILE="$OPTARG";;
+	?)   printf "Usage: %s: [-r] [-j] [-o] [-i] [-t type] [-f file]\n" $0
+	exit 2;;
+    esac
+done
+shift $(($OPTIND - 1))
+
+##########################################################
+# Validations
+##########################################################
+
+CR=`printf "\r"`
+
 if [ ! -d "${TMP_DIR}" ]; then
     mkdir ${TMP_DIR}
 else
     rm -rf ${TMP_DIR}/*
 fi
-if [ ! -d "${FOLDER}" ]; then
+if [ ! -d "${BK_DIR}" ]; then
     mkdir ${BK_DIR}
 fi
 
@@ -169,76 +214,103 @@ grep -q "^ *$" "${CONF_DIR}/vars_preferred"   && sed -i -e '/^ *$/d' "${CONF_DIR
 grep -q "^ *$" "${CONF_DIR}/vars_to_include"  && sed -i -e '/^ *$/d' "${CONF_DIR}/vars_to_include"
 grep -q "^ *$" "${CONF_DIR}/vars_to_skip"     && sed -i -e '/^ *$/d' "${CONF_DIR}/vars_to_skip"
 
-#########################################################
-#create NVRAM variale list and write to ${VARFILE}
-#########################################################
 
-nvram show 2>/dev/null | egrep '^[A-Za-z][A-Za-z0-9_\.\-]*=' | awk -F= '{print $1}' | sort -ruo ${TMP_DIR}/all_vars
-
-#########################################################
-# Write header to restore scripts
-#########################################################
-
-echo -e "#!/bin/sh\n#\necho \"Write variables\"\n" | tee -i ${TO_EXCLUDE} | tee -i ${TO_PREFERRED} | tee -i  ${TO_ALL} | tee -i ${TO_MINIMAL} > ${TO_INCLUDE}
-
-#########################################################
-# scan NVRAM variable list and send variable to proper
-# restore script
-#########################################################
-
-while read var ; do
-  pref=0
-  minim=0
-  if echo "${var}" | grep -q -f "${CONF_DIR}/vars_to_skip" ; then
-    bfile=$TO_EXCLUDE
-  else
-    bfile=$TO_INCLUDE
-    pref=`echo "${var}"  | grep -cf "${CONF_DIR}/vars_preferred"`
-    minim=`echo "${var}" | grep -cf "${CONF_DIR}/vars_minimal"`
-  fi
-
-  # get the data out of the variable
-  data="`nvram get ${var}`"
-  # write the var to the file and use \ for special chars: (\$`")
-  echo -en "nvram set ${var}=\"" | tee -ia ${TO_ALL} >> ${bfile}
-  echo -n "${data}" |  sed -e 's/[$`"\]/\\&/g' | tee -ia  ${TO_ALL} >> ${bfile}
-  echo -e "\"" | tee -ia  ${TO_ALL} >> ${bfile}
-  if [ ${pref} -ne 0 ]; then
-    echo -en "nvram set ${var}=\"" >> ${TO_PREFERRED}
-    echo -n "${data}" |  sed -e 's/[$`"\]/\\&/g' >> ${TO_PREFERRED}
-    echo -e "\"" >> ${TO_PREFERRED}
-  fi
-  if [ ${minim} -ne 0 ]; then
-    echo -en "nvram set ${var}=\"" >> ${TO_MINIMAL}
-    echo -n "${data}" |  sed -e 's/[$`"\]/\\&/g' >> ${TO_MINIMAL}
-    echo -e "\"" >> ${TO_MINIMAL}
-  fi
-done <${TMP_DIR}/all_vars
-
-#########################################################
-# cleanup remove all_vars
-# uncomment to remove file
-#########################################################
-
-rm ${TMP_DIR}/all_vars
-
-#########################################################
-# Write footer to restore script
-#########################################################
-
-echo -e "\n# Commit variables\necho \"Save variables to nvram\"\nnvram commit"  | tee -ia  ${TO_ALL} | tee -ia  ${TO_PREFERRED} | tee -ia  ${TO_EXCLUDE} | tee -ia  ${TO_MINIMAL} >> ${TO_INCLUDE}
-
-#########################################################
-# Change permissions on restore scripts to make them
-# executable
-#########################################################
-
-chmod +x ${TO_INCLUDE}
-chmod +x ${TO_PREFERRED}
-chmod +x ${TO_EXCLUDE}
-chmod +x ${TO_ALL}
-chmod +x ${TO_MINIMAL}
-
+if [ ${RESTORE} -eq 0 ]; then
+    if [ ${NVR} -eq 1 ]; then
+	
+	#########################################################
+	#create NVRAM variale list and write to ${TMP_DIR}/all_vars
+	#########################################################
+	
+	nvram show 2>/dev/null | egrep '^[A-Za-z][A-Za-z0-9_\.\-]*=' | awk -F= '{print $1}' | sort -ruo ${TMP_DIR}/all_vars
+	
+	#########################################################
+	# Write header to restore scripts
+	#########################################################
+	
+	echo -e "#!/bin/sh\n#\necho \"Write variables\"\n" | tee -i ${TO_EXCLUDE} | tee -i ${TO_PREFERRED} | tee -i  ${TO_ALL} | tee -i ${TO_MINIMAL} > ${TO_INCLUDE}
+	
+	#########################################################
+	# scan NVRAM variable list and send variable to proper
+	# restore script
+	#########################################################
+	
+	while read var ; do
+	    pref=0
+	    minim=0
+	    if echo "${var}" | grep -q -f "${CONF_DIR}/vars_to_skip" ; then
+		bfile=$TO_EXCLUDE
+	    else
+		bfile=$TO_INCLUDE
+		pref=`echo "${var}"  | grep -cf "${CONF_DIR}/vars_preferred"`
+		minim=`echo "${var}" | grep -cf "${CONF_DIR}/vars_minimal"`
+	    fi
+	    
+	    # get the data out of the variable
+	    data="`nvram get ${var}`"
+	    # write the var to the file and use \ for special chars: (\$`")
+	    echo -en "nvram set ${var}=\"" | tee -ia ${TO_ALL} >> ${bfile}
+	    echo -n "${data}" |  sed -e 's/[$`"\]/\\&/g' | tee -ia  ${TO_ALL} >> ${bfile}
+	    echo -e "\"" | tee -ia  ${TO_ALL} >> ${bfile}
+	    if [ ${pref} -ne 0 ]; then
+		echo -en "nvram set ${var}=\"" >> ${TO_PREFERRED}
+		echo -n "${data}" |  sed -e 's/[$`"\]/\\&/g' >> ${TO_PREFERRED}
+		echo -e "\"" >> ${TO_PREFERRED}
+	    fi
+	    if [ ${minim} -ne 0 ]; then
+		echo -en "nvram set ${var}=\"" >> ${TO_MINIMAL}
+		echo -n "${data}" |  sed -e 's/[$`"\]/\\&/g' >> ${TO_MINIMAL}
+		echo -e "\"" >> ${TO_MINIMAL}
+	    fi
+	done <${TMP_DIR}/all_vars
+	
+	#########################################################
+	# cleanup remove all_vars
+	# uncomment to remove file
+	#########################################################
+	
+	rm ${TMP_DIR}/all_vars
+	
+	#########################################################
+	# Write footer to restore script
+	#########################################################
+	
+	echo -e "\n# Commit variables\necho \"Save variables to nvram\"\nnvram commit"  | tee -ia  ${TO_ALL} | tee -ia  ${TO_PREFERRED} | tee -ia  ${TO_EXCLUDE} | tee -ia  ${TO_MINIMAL} >> ${TO_INCLUDE}
+	
+	#########################################################
+	# Change permissions on restore scripts to make them
+	# executable
+	#########################################################
+	
+	chmod +x ${TO_INCLUDE}
+	chmod +x ${TO_PREFERRED}
+	chmod +x ${TO_EXCLUDE}
+	chmod +x ${TO_ALL}
+	chmod +x ${TO_MINIMAL}
+	
+    fi
+    if [ ${IMG} -eq 1 ]; then
+	nvram backup ${TMP_DIR}/nvram.img
+    fi
+    
+    if [ ${OPT} -eq 1 ]; then
+	mkdir ${TMP_DIR}/opt 
+	if [ $(command -v rsync) != "" ]; then
+	    rsync -a ${OPT_EXCLUDE} /opt/* ${TMP_DIR}/opt/
+	else
+	    cp -a /opt/* ${TMP_DIR}/opt/
+	fi
+    fi
+    if [ ${JFFS} -eq 1 ]; then
+	mkdir ${TMP_DIR}/jffs 
+	if [ $(command -v rsync) != "" ]; then
+	    rsync -a ${JFFS_EXCLUDE} /jffs/* ${TMP_DIR}/jffs/
+	else
+	    cp -a /jffs/* ${TMP_DIR}/jffs/
+	fi
+    fi
+fi
+	
 #########################################################
 # Compress restore scripts
 #########################################################
