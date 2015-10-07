@@ -39,7 +39,7 @@ NAME="$0"
 [ -z "`which readlink`" ] || NAME="`readlink -f "${NAME}"`"
 CUR_DIR=`dirname ${NAME}`
 CONF_DIR='/opt/etc/ddwrt-bk'
-BK_DIR=/jffs/backups
+BK_DIR=/jffs/ddwrt-backups
 TMP_DIR=/tmp/ddwrt-bk
 
 RESTORE=0
@@ -289,8 +289,11 @@ if [ ${RESTORE} -eq 0 ]; then
 	echo "Backing up nvram image..."
 	nvram backup ${TMP_DIR}/nvram.img
     fi
-fi
 
-#########################################################
-# Compress restore scripts
-#########################################################
+    #########################################################
+    # Compress restore scripts
+    #########################################################
+    tar -cvzf ${BK_DIR}/${FILE} -C ${TMP_DIR} .
+
+    rm -rf ${TMP_DIR}
+fi
